@@ -14,3 +14,5 @@ from __future__ import print_function
 
 import models.pose_resnet
 import models.pose_hrnet
+import models.pose_resnet_psa
+import models.pose_hrnet_psa
