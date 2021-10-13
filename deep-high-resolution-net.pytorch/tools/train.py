@@ -88,9 +88,7 @@ def main():
     torch.backends.cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = cfg.CUDNN.ENABLED
 
-    model = eval('models.'+cfg.MODEL.NAME+'.get_pose_net')(
-        cfg, is_train=True
-    )
+    model = models.MODELS[cfg.MODEL.NAME](cfg, is_train=True)
 
     # copy model file
     this_dir = os.path.dirname(__file__)
