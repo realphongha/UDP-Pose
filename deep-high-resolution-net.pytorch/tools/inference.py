@@ -59,6 +59,7 @@ def parse_opt():
     parser.add_argument('--det_model', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path(s)')
     parser.add_argument('--weights', type=str, default=None, help='.pth weights for det_model')
     parser.add_argument('--source', nargs='+', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob, 0 for webcam')
+    parser.add_argument('--padding', type=int, default=5, help='Human bounding box padding for pose estimation')
     parser.add_argument('--fps', type=int, default=None, help='FPS for output video')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
@@ -119,6 +120,7 @@ class Pose:
         self.config = config
         self.img_size = config.MODEL.IMAGE_SIZE
         self.img_size_det = opt.imgsz
+        self.padding = opt.padding
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
         self.det_model = det_model
@@ -171,6 +173,18 @@ class Pose:
 
         image_patches = torch.stack(image_patches).to(self.device)
         return self.pose_model(image_patches)
+    
+    def _padding_bbox(self, x1, y1, x2, y2, img_shape):
+        h, w = img_shape[:2]
+        x1 -= 5
+        y1 -= 5
+        x1 = 0 if x1 < 0 else x1
+        y1 = 0 if y1 < 0 else y1
+        x2 += 5
+        y2 += 5
+        x2 = w if x2 > w else x2
+        y2 = h if y2 > h else y2
+        return x1, y1, x2, y2
 
     def postprocess(self, pred, img1, img0):
         classes = opt.classes
@@ -189,6 +203,7 @@ class Pose:
                 for box in boxes.numpy():
                     x1, y1, x2, y2 = box
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    x1, y1, x2, y2 = self._padding_bbox(x1, y1, x2, y2, img0.shape)
                     img0 = cv2.rectangle(img0, (x1, y1), (x2, y2), (255, 0, 0), 1)
                     cv2.putText(img0, str(box_class), (x1, y1), 
                         cv2.FONT_HERSHEY_SIMPLEX,
