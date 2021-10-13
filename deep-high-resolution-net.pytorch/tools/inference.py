@@ -174,6 +174,8 @@ class Pose:
 
     def postprocess(self, pred, img1, img0):
         classes = opt.classes
+        if classes is None:
+            classes = list()
         classes.append(opt.person_class)
         pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=classes)
 
