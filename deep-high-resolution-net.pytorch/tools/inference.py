@@ -186,7 +186,7 @@ class Pose:
         y2 = h if y2 > h else y2
         return x1, y1, x2, y2
 
-    def postprocess(self, pred, img1, img0):
+    def postprocess(self, pred, img1, img0, pose_fps):
         classes = opt.classes
         if classes is None:
             classes = list()
@@ -209,6 +209,7 @@ class Pose:
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1, (255, 0, 0), 2, cv2.LINE_AA)
                 if box_class == opt.person_class:
+                    begin = time()
                     boxes = self.box_to_center_scale(boxes)
                     outputs = self.predict_poses(boxes, img0).clone().cpu().numpy()
 
@@ -216,13 +217,14 @@ class Pose:
                         get_final_preds(self.config, outputs, 
                                         boxes[:, :2].numpy(), 
                                         boxes[:, 2:].numpy())
+                    pose_fps.append((time()-begin)/preds.shape[0])
                     draw_keypoints(img0, preds, self.skeleton, 1)
 
     @torch.no_grad()
-    def predict(self, image):
+    def predict(self, image, pose_fps):
         img = self.preprocess(image)
         pred = self.det_model(img)[0]  
-        self.postprocess(pred, img, image)
+        self.postprocess(pred, img, image, pose_fps)
         return image
 
 
@@ -293,6 +295,7 @@ def main(opt):
                                     fps, 
                                     (frame_w, frame_h))
 
+            pose_fps = []
             for i in tqdm(range(nb_frames)):
                 begin = time()
                 ret, frame = video_reader.read()
@@ -300,23 +303,32 @@ def main(opt):
                     break
                 if frame is None:
                     continue
-                frame = pose.predict(frame)
+                frame = pose.predict(frame, pose_fps)
                 fps = 1/(time()-begin)
-                cv2.putText(frame, "%.2f" % fps, (0, frame_h-5), 
+                pose_pps = 1/np.mean(pose_fps) if pose_fps else -1
+                cv2.putText(frame, "FPS: %.2f, Pose PPS: %.2f" % (fps, pose_pps), (0, frame_h-5), 
                             cv2.FONT_HERSHEY_SIMPLEX,
                             2, (0, 0, 255), 2, cv2.LINE_AA)
                 video_writer.write(np.uint8(frame))
+                if i % 100 == 0:
+                    print("\nPose FPS:", pose_pps)
 
+            print("\nPose FPS:", 1/np.mean(pose_fps))
             video_reader.release()
             video_writer.release()
         else:
             webcam = WebcamStream()
             fps = FPS()
 
+            pose_fps = []
+            i = 1
             for frame in webcam:
                 fps.start()
-                output = pose.predict(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                output = pose.predict(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), pose_fps)
                 fps.stop()
+                if i % 100 == 0:
+                    print("\nPose FPS:", 1/np.mean(pose_fps))
+                i += 1
                 cv2.imshow('frame', cv2.cvtColor(output, cv2.COLOR_RGB2BGR))
 
 
