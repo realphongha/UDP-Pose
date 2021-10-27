@@ -65,7 +65,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
-    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='cuda', help='cuda or cpu')
     parser.add_argument('--view-img', action='store_true', help='show results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
@@ -139,6 +139,11 @@ class Pose:
             self.skeleton = Pose.SKELETONS[config.DATASET.DATASET.lower()]
         except KeyError:
             self.skeleton = None
+            
+        self.classes = opt.classes
+        if self.classes is None:
+            self.classes = list()
+        self.classes.append(opt.person_class)
         
 
     def preprocess(self, image):   
@@ -187,38 +192,39 @@ class Pose:
         return x1, y1, x2, y2
 
     def postprocess(self, pred, img1, img0, pose_fps):
-        classes = opt.classes
-        if classes is None:
-            classes = list()
-        classes.append(opt.person_class)
-        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=classes)
+        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=self.classes)
 
-        for det in pred:
+        det = pred[0]
 
-            if len(det):
-                box_class = int(det[0][5])
+        if len(det):
+            boxes = scale_boxes(det[:, :4], img0.shape[:2], img1.shape[-2:]).cpu()
+            person_boxes = list()
+            for i, box in enumerate(boxes.numpy()):
+                box_class = int(det[i][5])
                 if box_class != opt.person_class and box_class not in opt.classes:
                     continue
-                boxes = scale_boxes(det[:, :4], img0.shape[:2], img1.shape[-2:]).cpu()
-                for box in boxes.numpy():
-                    x1, y1, x2, y2 = box
-                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                    x1, y1, x2, y2 = self._padding_bbox(x1, y1, x2, y2, img0.shape)
-                    img0 = cv2.rectangle(img0, (x1, y1), (x2, y2), (255, 0, 0), 1)
-                    cv2.putText(img0, str(box_class), (x1, y1), 
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1, (255, 0, 0), 2, cv2.LINE_AA)
+                x1, y1, x2, y2 = box
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                x1, y1, x2, y2 = self._padding_bbox(x1, y1, x2, y2, img0.shape)
                 if box_class == opt.person_class:
-                    begin = time()
-                    boxes = self.box_to_center_scale(boxes)
-                    outputs = self.predict_poses(boxes, img0).clone().cpu().numpy()
+                    person_boxes.append([x1, y1, x2, y2])
+                img0 = cv2.rectangle(img0, (x1, y1), (x2, y2), (255, 0, 0), 1)
+                cv2.putText(img0, str(box_class), (x1, y1), 
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (255, 0, 0), 2, cv2.LINE_AA)
+            
+            if person_boxes:
+                boxes = torch.Tensor(person_boxes)
+                begin = time()
+                boxes = self.box_to_center_scale(boxes)
+                outputs = self.predict_poses(boxes, img0).clone().cpu().numpy()
 
-                    preds, maxvals, preds_in_input_space = \
-                        get_final_preds(self.config, outputs, 
-                                        boxes[:, :2].numpy(), 
-                                        boxes[:, 2:].numpy())
-                    pose_fps.append((time()-begin)/preds.shape[0])
-                    draw_keypoints(img0, preds, self.skeleton, 1)
+                preds, maxvals, preds_in_input_space = \
+                    get_final_preds(self.config, outputs, 
+                                    boxes[:, :2].numpy(), 
+                                    boxes[:, 2:].numpy())
+                pose_fps.append((time()-begin)/preds.shape[0])
+                draw_keypoints(img0, preds, self.skeleton, 1)
 
     @torch.no_grad()
     def predict(self, image, pose_fps):
@@ -229,7 +235,7 @@ class Pose:
 
 
 def main(opt):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(opt.device)
     
     if opt.weights:
         num_classes = 1 if (opt.classes is None) else (len(opt.classes)+1)
@@ -308,7 +314,7 @@ def main(opt):
                 pose_pps = 1/np.mean(pose_fps) if pose_fps else -1
                 cv2.putText(frame, "FPS: %.2f, Pose PPS: %.2f" % (fps, pose_pps), (0, frame_h-5), 
                             cv2.FONT_HERSHEY_SIMPLEX,
-                            2, (0, 0, 255), 2, cv2.LINE_AA)
+                            1, (0, 0, 255), 2, cv2.LINE_AA)
                 video_writer.write(np.uint8(frame))
                 if i % 100 == 0:
                     print("\nPose FPS:", pose_pps)
