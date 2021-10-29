@@ -1,11 +1,3 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
-"""
-Run inference on images, videos, directories, streams, etc.
-
-Usage:
-    $ python path/to/detect.py --source path/to/img.jpg --weights yolov5s.pt --img 640
-"""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -192,7 +184,9 @@ class Pose:
         return x1, y1, x2, y2
 
     def postprocess(self, pred, img1, img0, pose_fps):
-        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=self.classes)
+        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, 
+                                   classes=self.classes,
+                                   max_det=self.opt.max_det)
 
         det = pred[0]
 

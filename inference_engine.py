@@ -41,7 +41,7 @@ if str(ROOT2) not in sys.path:
 sys.path.insert(0, str(os.path.join(ROOT2, "lib")))
 from lib.models import MODELS
 from lib.core.inference import get_final_preds
-from deep_hrnet.pose_engine import UdpPsaPoseTorch
+from deep_hrnet.pose_engine import *
 
 
 def parse_opt():
@@ -71,6 +71,7 @@ def parse_opt():
     parser.add_argument('--max-det', type=int, default=1000,
                         help='maximum detections per image')
     parser.add_argument('--device', default='cuda', help='cuda or cpu')
+    parser.add_argument('--pose-device', default='cpu', help='device for pose estimation')
     parser.add_argument('--view-img', action='store_true', help='show results')
     parser.add_argument('--save-txt', action='store_true',
                         help='save results to *.txt')
@@ -182,7 +183,8 @@ class YoloDetectionTorch(YoloDetectionAbs):
         pred = non_max_suppression(pred,
                                    self.conf_thres,
                                    self.iou_thres,
-                                   classes=self.classes)
+                                   classes=self.classes,
+                                   max_det=self.opt.max_det)
         det = pred[0]
 
         if len(det):
@@ -220,13 +222,25 @@ class YoloDetectionTorch(YoloDetectionAbs):
 def main(opt):
     device = torch.device(opt.device)
 
+    det_engine = YoloDetectionTorch(opt, device)
     if opt.pose_format == 'torch':
-        det_engine = YoloDetectionTorch(opt, device)
         pose_engine = UdpPsaPoseTorch(opt.pose_model,
                                       opt.cfg,
                                       device)
+    elif opt.pose_format == 'onnx':
+        pose_engine = UdpPsaPoseOnnx(opt.pose_model,
+                                     opt.cfg,
+                                     opt.device)
+    elif opt.pose_format == 'openvino':
+        pose_engine = UdpPsaPoseOpenVino(opt.pose_model,
+                                         opt.cfg,
+                                         opt.pose_device)
+    elif opt.pose_format == 'mnn':
+        pose_engine = UdpPsaPoseMNN(opt.pose_model,
+                                    opt.cfg,
+                                    opt.pose_device)
     else:
-        raise Exception("Model format is not implemented!")
+        raise Exception("%s format is not implemented!" % opt.pose_format)
 
     for s in opt.source:
         print("Processing %s ..." % s)

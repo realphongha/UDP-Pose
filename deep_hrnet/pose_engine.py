@@ -134,3 +134,176 @@ class UdpPsaPoseTorch(UdpPsaPoseAbs):
         outputs = self.model(pose_input).clone().cpu().numpy()
         keypoints = self._postprocess(outputs, boxes)
         return keypoints
+    
+    
+class UdpPsaPoseOnnx(UdpPsaPoseAbs):
+    
+    def __init__(self, model_path, config_path, device):
+        super(UdpPsaPoseOnnx, self).__init__(config_path)
+        
+        import onnxruntime
+        
+        self.ort_session = onnxruntime.InferenceSession(model_path)
+        self.input_name = self.ort_session.get_inputs()[0].name
+        
+        self._device = device
+        
+    def _preprocess(self, img, boxes):
+        boxes = self._box_to_center_scale(boxes)
+        image_patches = []
+        for cx, cy, w, h in boxes:
+            trans = get_affine_transform(np.array([cx, cy]), 
+                                         np.array([w, h]), 
+                                         self.input_shape)
+            img_patch = cv2.warpAffine(
+                img, 
+                trans, 
+                (int(self.input_shape[0]), int(self.input_shape[1])), 
+                flags=cv2.INTER_LINEAR)
+            img_patch = self.pose_transform(img_patch)
+            image_patches.append(img_patch)
+            
+        image_patches = torch.stack(image_patches)
+        return image_patches, boxes
+    
+    def _postprocess(self, outputs, boxes):
+        preds, maxvals, preds_in_input_space = \
+                        get_final_preds(self.config, outputs, 
+                                        boxes[:, :2].numpy(), 
+                                        boxes[:, 2:].numpy())
+        return preds
+    
+    @torch.no_grad()
+    def infer_pose(self, img, boxes):
+        pose_input, boxes =  self._preprocess(img, boxes)
+        pose_input = np.array(pose_input)
+        outputs = self.ort_session.run(None, {self.input_name: pose_input})[0]
+        keypoints = self._postprocess(outputs, boxes)
+        return keypoints    
+
+
+class UdpPsaPoseOpenVino(UdpPsaPoseAbs):
+    
+    def __init__(self, model_path, config_path, device):
+        super(UdpPsaPoseOpenVino, self).__init__(config_path)
+        
+        from openvino.inference_engine import IECore
+        
+        ie = IECore()
+        net = ie.read_network(model=model_path + ".xml", 
+                              weights=model_path + ".bin")
+        self._device = device
+        self.model = ie.load_network(net, self._device)
+        self._outputs = list(self.model.outputs.keys())
+        self.input_blob = next(iter(self.model.input_info))
+        self.output_blob = next(iter(self.model.outputs))
+        
+    def _preprocess(self, img, boxes):
+        boxes = self._box_to_center_scale(boxes)
+        image_patches = []
+        for cx, cy, w, h in boxes:
+            trans = get_affine_transform(np.array([cx, cy]), 
+                                         np.array([w, h]), 
+                                         self.input_shape)
+            img_patch = cv2.warpAffine(
+                img, 
+                trans, 
+                (int(self.input_shape[0]), int(self.input_shape[1])), 
+                flags=cv2.INTER_LINEAR)
+            img_patch = self.pose_transform(img_patch)
+            image_patches.append(img_patch)
+            
+        image_patches = torch.stack(image_patches)
+        return image_patches, boxes
+    
+    def _postprocess(self, outputs, boxes):
+        preds, maxvals, preds_in_input_space = \
+                        get_final_preds(self.config, outputs, 
+                                        boxes[:, :2].numpy(), 
+                                        boxes[:, 2:].numpy())
+        return preds
+    
+    @torch.no_grad()
+    def infer_pose(self, img, boxes):
+        pose_input, boxes =  self._preprocess(img, boxes)
+        outputs = None
+        for i in range(pose_input.shape[0]):
+            inference_results = self.model.infer(inputs={self.input_blob: pose_input[i]})
+            output = inference_results[self._outputs[0]]
+            if outputs is None:
+                outputs = output
+            else:
+                outputs = np.concatenate((outputs, output))
+        keypoints = self._postprocess(outputs, boxes)
+        return keypoints    
+    
+    
+class UdpPsaPoseMNN(UdpPsaPoseAbs):
+    
+    import MNN as MNNlib
+    
+    def __init__(self, model_path, config_path, device):
+        super(UdpPsaPoseMNN, self).__init__(config_path)
+
+        self.interpreter = self.MNNlib.Interpreter(model_path)
+        self.interpreter.setCacheFile('.tempcache')
+        config = {}
+        config['precision'] = 'low'
+        runtimeinfo, exists = self.MNNlib.Interpreter.createRuntime((config,))
+        # print(runtimeinfo, exists)
+        self.session = self.interpreter.createSession(config, runtimeinfo)
+        self.input_tensor = self.interpreter.getSessionInput(self.session)
+        
+    def _preprocess(self, img, boxes):
+        boxes = self._box_to_center_scale(boxes)
+        image_patches = []
+        for cx, cy, w, h in boxes:
+            trans = get_affine_transform(np.array([cx, cy]), 
+                                         np.array([w, h]), 
+                                         self.input_shape)
+            img_patch = cv2.warpAffine(
+                img, 
+                trans, 
+                (int(self.input_shape[0]), int(self.input_shape[1])), 
+                flags=cv2.INTER_LINEAR)
+            img_patch = self.pose_transform(img_patch)
+            image_patches.append(img_patch)
+            
+        image_patches = torch.stack(image_patches)
+        return image_patches, boxes
+    
+    def _postprocess(self, outputs, boxes):
+        preds, maxvals, preds_in_input_space = \
+                        get_final_preds(self.config, outputs, 
+                                        boxes[:, :2].numpy(), 
+                                        boxes[:, 2:].numpy())
+        return preds
+    
+    @torch.no_grad()
+    def infer_pose(self, img, boxes):
+        pose_input, boxes =  self._preprocess(img, boxes)
+        self.interpreter.resizeTensor(self.input_tensor, pose_input.shape)
+        self.interpreter.resizeSession(self.session)
+        tmp_input = self.MNNlib.Tensor(
+            tuple(pose_input.shape),
+            self.MNNlib.Halide_Type_Float,
+            pose_input.numpy(), 
+            self.MNNlib.Tensor_DimensionType_Caffe
+        )
+        if not self.input_tensor.copyFromHostTensor(tmp_input):
+            raise Exception("Copying MNN tensor failed!")
+        self.interpreter.runSession(self.session)
+        raw_outputs = self.interpreter.getSessionOutput(self.session)
+        # construct a tmp tensor and copy/convert in case output_tensor is nc4hw4
+
+        # out_shape = raw_outputs.getShape()
+        # out_shape = (pose_input.shape[0], out_shape[1], out_shape[2], out_shape[3])
+        # tmp_output = self.MNNlib.Tensor(
+        #     out_shape, 
+        #     self.MNNlib.Halide_Type_Float, 
+        #     np.ones(list(out_shape)).astype(np.float32), 
+        #     self.MNNlib.Tensor_DimensionType_Caffe)
+        # raw_outputs.copyToHostTensor(tmp_output)
+        outputs = raw_outputs.getNumpyData().reshape(raw_outputs.getShape())
+        keypoints = self._postprocess(outputs, boxes)
+        return keypoints    

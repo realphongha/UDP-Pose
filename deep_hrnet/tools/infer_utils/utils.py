@@ -29,7 +29,8 @@ def draw_coco_keypoints(img, keypoints, skeletons):
 
 
 def draw_keypoints(img, keypoints, skeletons=False, r=1):
-    if keypoints == []: return img
+    if len(keypoints) == 0: 
+        return img
     for kpts in keypoints:
         if skeletons:
             for kid1, kid2 in skeletons:
