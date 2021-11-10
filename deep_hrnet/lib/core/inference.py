@@ -9,10 +9,12 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+import sys
 
 import numpy as np
 from numpy.linalg import LinAlgError
-from ..utils.transforms import transform_preds
+sys.path.append("..")
+from utils.transforms import transform_preds
 import cv2
 
 def get_max_preds(batch_heatmaps):
