@@ -12,7 +12,7 @@ import math
 
 import numpy as np
 from numpy.linalg import LinAlgError
-from lib.utils.transforms import transform_preds
+from ..utils.transforms import transform_preds
 import cv2
 
 def get_max_preds(batch_heatmaps):

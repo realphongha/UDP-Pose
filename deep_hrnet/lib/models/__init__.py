@@ -12,14 +12,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import lib.models.pose_resnet as pr
-import lib.models.pose_hrnet as ph
-import lib.models.pose_resnet_psa as prp
-import lib.models.pose_hrnet_psa as php
+from .pose_resnet import get_pose_net as pr
+from .pose_hrnet  import get_pose_net as ph
+from .pose_resnet_psa import get_pose_net as prp
+from .pose_hrnet_psa import get_pose_net as php
 
 MODELS = {
-    "pose_resnet": pr.get_pose_net,
-    "pose_hrnet": ph.get_pose_net,
-    "pose_resnet_psa": prp.get_pose_net,
-    "pose_hrnet_psa": php.get_pose_net,
+    "pose_resnet": pr,
+    "pose_hrnet": ph,
+    "pose_resnet_psa": prp,
+    "pose_hrnet_psa": php,
 }
