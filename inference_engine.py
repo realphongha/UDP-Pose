@@ -318,19 +318,27 @@ def main(opt):
             webcam = WebcamStream()
 
             i = 1
+            fps = []
+            pose_fps = []
             for frame in webcam:
                 begin_fps = time()
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 boxes = det_engine.infer(frame)
                 if boxes is not None:
+                    begin_pose_fps = time()
                     keypoints = pose_engine.infer_pose(frame, boxes)
-                    output = pose_engine.draw_keypoints(
+                    pose_fps.append(time()-begin_pose_fps)
+                    frame = pose_engine.draw_keypoints(
                         frame, keypoints, radius=1)
-
-                if i % 100 == 0:
-                    print("FPS:", 1/(time()-begin_fps))
+                fps.append(time()-begin_fps)
+                
+                if i % 10 == 0:
+                    if fps:
+                        print("FPS:", 1/np.mean(fps))
+                    if pose_fps:
+                        print("Pose FPS:", 1/np.mean(pose_fps))
                 i += 1
-                cv2.imshow('frame', cv2.cvtColor(output, cv2.COLOR_RGB2BGR))
+                cv2.imshow('frame', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
 
 if __name__ == "__main__":

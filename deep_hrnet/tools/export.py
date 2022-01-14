@@ -69,7 +69,7 @@ def main(opt):
     config.defrost()
     config.merge_from_file(opt.cfg)  
     pose_model = MODELS[config.MODEL.NAME](config, is_train=False)
-    state_dict = torch.load(opt.pose_model)
+    state_dict = torch.load(opt.pose_model, map_location=device)
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -79,7 +79,7 @@ def main(opt):
             name = k
         new_state_dict[name] = v
     state_dict = new_state_dict
-    pose_model.load_state_dict(state_dict)
+    pose_model.load_state_dict(state_dict, strict=False)
     pose_model.to(device)
     pose_model.eval()
     

@@ -103,7 +103,7 @@ class UdpPsaPoseTorch(UdpPsaPoseAbs):
         self.config.TEST.MODEL_FILE = model_path
         self._device = device
         self.model = MODELS[self.config.MODEL.NAME](self.config, is_train=False)
-        state_dict = torch.load(model_path)
+        state_dict = torch.load(model_path, map_location=device)
         from collections import OrderedDict
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
@@ -113,7 +113,7 @@ class UdpPsaPoseTorch(UdpPsaPoseAbs):
                 name = k
             new_state_dict[name] = v
         state_dict = new_state_dict
-        self.model.load_state_dict(state_dict)
+        self.model.load_state_dict(state_dict, strict=False)
         self.model.to(device)
         self.model.eval()
     
@@ -142,7 +142,10 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
     def infer_pose(self, img, boxes):
         pose_input, boxes =  self._preprocess(img, boxes)
         pose_input = np.array(pose_input)
-        outputs = self.ort_session.run(None, {self.input_name: pose_input})[0]
+        outputs = None
+        for i in range(pose_input.shape[0]):
+            output = self.ort_session.run(None, {self.input_name: pose_input[i][None]})[0]
+            outputs = output if outputs is None else np.concatenate((outputs, output), axis=0)
         keypoints = self._postprocess(outputs, boxes)
         return keypoints    
 

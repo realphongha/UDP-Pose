@@ -83,6 +83,32 @@ def save_checkpoint(states, is_best, output_dir,
         torch.save(states['best_state_dict'],
                    os.path.join(output_dir, 'model_best.pth'))
 
+def load_checkpoint(model, checkpoint, strict=False):
+    checkpoint = torch.load(checkpoint,
+                            map_location=lambda storage, loc: storage)
+    source_state_ = checkpoint
+    source_state = {}
+
+    target_state = model.state_dict()
+    new_target_state = collections.OrderedDict()
+
+    for k in source_state_:
+        if k.startswith('module') and not k.startswith('module_list'):
+            source_state[k[7:]] = source_state_[k]
+        else:
+            source_state[k] = source_state_[k]
+
+    for target_key, target_value in target_state.items():
+        if target_key in source_state and source_state[target_key].size() == target_state[target_key].size():
+            new_target_state[target_key] = source_state[target_key]
+        else:
+            new_target_state[target_key] = target_state[target_key]
+            print('[WARNING] Not found pre-trained parameters for {}'.format(target_key))
+
+    model.load_state_dict(new_target_state, strict=strict)
+
+    return model
+
 
 def get_model_summary(model, *input_tensors, item_length=26, verbose=False):
     """

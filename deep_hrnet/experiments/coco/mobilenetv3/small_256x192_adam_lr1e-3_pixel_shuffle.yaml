@@ -7,7 +7,7 @@ DATA_DIR: ''
 GPUS: (0,)
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
-WORKERS: 8
+WORKERS: 4
 PRINT_FREQ: 100
 
 DATASET:
@@ -17,17 +17,17 @@ DATASET:
   FLIP: true
   NUM_JOINTS_HALF_BODY: 8
   PROB_HALF_BODY: 0.3
-  ROOT: '/mnt/cephfs/algorithm/public_data/ori_data/coco2017/'
+  ROOT: '/mnt/hdd10tb/Users/phonghh/data/COCO2017'
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SET: 'val2017'
   TRAIN_SET: 'train2017'
 MODEL:
   INIT_WEIGHTS: true
-  NAME: pose_hrnet_psa2
+  NAME: pose_mobilenetv3_small_pixel_shuffle
   NUM_JOINTS: 17
-  PRETRAINED: "/mnt/cephfs/algorithm/junjie.huang/pretrained_models/hrnet_w32-36af842e.pth"
-  TARGET_TYPE: 'offset'
+  PRETRAINED: "yes please" # leave it empty if you don't need pretrained
+  TARGET_TYPE: 'gaussian' # 'offset'
   IMAGE_SIZE:
   - 192
   - 256
@@ -36,58 +36,12 @@ MODEL:
   - 64
   SIGMA: 2
   EXTRA:
+    START_CHANNELS: 256
+    ARCHITECTURE: (512, 256, 128)
+    MODEL_SIZE: 'small' # 'large'
     PRETRAINED_LAYERS:
-    - 'conv1'
-    - 'bn1'
-    - 'conv2'
-    - 'bn2'
-    - 'layer1'
-    - 'transition1'
-    - 'stage2'
-    - 'transition2'
-    - 'stage3'
-    - 'transition3'
-    - 'stage4'
+    - 'backbone'
     FINAL_CONV_KERNEL: 1
-    STAGE2:
-      NUM_MODULES: 1
-      NUM_BRANCHES: 2
-      BLOCK: BASIC
-      NUM_BLOCKS:
-      - 4
-      - 4
-      NUM_CHANNELS:
-      - 32
-      - 64
-      FUSE_METHOD: SUM
-    STAGE3:
-      NUM_MODULES: 4
-      NUM_BRANCHES: 3
-      BLOCK: BASIC
-      NUM_BLOCKS:
-      - 4
-      - 4
-      - 4
-      NUM_CHANNELS:
-      - 32
-      - 64
-      - 128
-      FUSE_METHOD: SUM
-    STAGE4:
-      NUM_MODULES: 3
-      NUM_BRANCHES: 4
-      BLOCK: BASIC
-      NUM_BLOCKS:
-      - 4
-      - 4
-      - 4
-      - 4
-      NUM_CHANNELS:
-      - 32
-      - 64
-      - 128
-      - 256
-      FUSE_METHOD: SUM
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
@@ -112,7 +66,7 @@ TEST:
   BBOX_THRE: 1.0
   IMAGE_THRE: 0.0
   IN_VIS_THRE: 0.2
-  MODEL_FILE: ''
+  MODEL_FILE: 'model_best.pth'
   NMS_THRE: 1.0
   OKS_THRE: 0.9
   USE_GT_BBOX: true

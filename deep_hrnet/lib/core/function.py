@@ -7,7 +7,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
- 
+
 import time
 import logging
 import os
@@ -133,11 +133,16 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
     filenames = []
     imgnums = []
     idx = 0
+    ips = []
     with torch.no_grad():
         end = time.time()
         for i, (input, target, target_weight, meta) in enumerate(val_loader):
             # compute output
+            start_pose = time.time()
             outputs = model(input)
+            ips.append((time.time()-start_pose)/outputs.shape[0])
+            if i % 10 == 9:
+                print("IPS:", 1.0/np.mean(ips))
             if isinstance(outputs, list):
                 output = outputs[-1]
             else:

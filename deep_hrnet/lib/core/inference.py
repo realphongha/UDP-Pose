@@ -14,8 +14,18 @@ import sys
 import numpy as np
 from numpy.linalg import LinAlgError
 sys.path.append("..")
-from utils.transforms import transform_preds
 import cv2
+
+
+def transform_preds(coords, center, scale, output_size):
+    scale = scale * 200.0
+    scale_x = scale[0]/(output_size[0]-1.0)
+    scale_y = scale[1]/(output_size[1]-1.0)
+    target_coords = np.zeros(coords.shape)
+    target_coords[:,0] = coords[:,0]*scale_x + center[0]-scale[0]*0.5
+    target_coords[:,1] = coords[:,1]*scale_y + center[1]-scale[1]*0.5
+    return target_coords
+
 
 def get_max_preds(batch_heatmaps):
     '''

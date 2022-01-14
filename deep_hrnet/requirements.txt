@@ -1,5 +1,5 @@
-torch==1.7.0 
-torchvision==0.8.1
+torch==1.8.1 
+torchvision==0.9.1
 EasyDict==1.7
 opencv-python==3.4.2.17
 shapely
@@ -12,6 +12,7 @@ scikit-image
 yacs>=0.1.5
 tensorboardX==1.6
 tqdm
+thop
 
 ## onnx:
 # onnx==1.10.2

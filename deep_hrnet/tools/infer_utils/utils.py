@@ -24,19 +24,20 @@ def draw_coco_keypoints(img, keypoints, skeletons):
             x1, y1, v1 = kpts[kid1-1]
             x2, y2, v2 = kpts[kid2-1]
             if v1 == 2 and v2 == 2:
-                cv2.line(image, (x1, y1), (x2, y2), (0, 255, 0), 2)   
-    return image 
+                cv2.line(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    return image
 
 
 def draw_keypoints(img, keypoints, skeletons=False, r=1):
-    if len(keypoints) == 0: 
+    if len(keypoints) == 0:
         return img
     for kpts in keypoints:
+        kpts = [list(map(int, x)) for x in kpts]
         if skeletons:
             for kid1, kid2 in skeletons:
                 cv2.line(img, tuple(kpts[kid1-1]), tuple(kpts[kid2-1]), (0, 255, 0), 2, cv2.LINE_AA)
         for x, y in kpts:
-            cv2.circle(img, (x, y), r, (255, 0, 0), 2, cv2.LINE_AA)   
+            cv2.circle(img, (x, y), r, (255, 0, 0), 2, cv2.LINE_AA)
 
 
 class WebcamStream:
