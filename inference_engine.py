@@ -1,9 +1,11 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from re import L
 
 import sys
 import os
+from black import out
 from tqdm import tqdm
 from pathlib import Path
 from time import time
@@ -24,6 +26,7 @@ import cv2
 import numpy as np
 
 from deep_hrnet.tools.infer_utils.boxes import letterbox, scale_boxes, non_max_suppression
+from deep_hrnet.tools.infer_utils.boxes import yolo2xyxy
 from deep_hrnet.tools.infer_utils.utils import WebcamStream
 
 FILE = Path(__file__).resolve()
@@ -97,6 +100,10 @@ def parse_opt():
                         'runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp',
                         help='save results to project/name')
+    parser.add_argument('--bbox-dir', default=None,
+                        help='bbox detection results for pose labelling')
+    parser.add_argument('--save-dir', default=None,
+                        help='path to save pose detection results')
     parser.add_argument('--exist-ok', action='store_true',
                         help='existing project/name ok, do not increment')
     parser.add_argument('--line-thickness', default=3,
@@ -107,6 +114,8 @@ def parse_opt():
                         action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true',
                         help='use FP16 half-precision inference')
+    parser.add_argument('--save-lbl', action='store_true',
+                        help='save detection and pose labels')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     return opt
@@ -251,24 +260,69 @@ def main(opt):
             # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             boxes = det_engine.infer(image)
             if boxes is not None:
-                keypoints = pose_engine.infer_pose(image, boxes)
+                keypoints, _ = pose_engine.infer_pose(image, boxes)
                 output = pose_engine.draw_keypoints(image, keypoints, radius=1)
             cv2.imwrite(f"{str(source).rsplit('.', maxsplit=1)[0]}_out.jpg", cv2.cvtColor(
                 output, cv2.COLOR_RGB2BGR))
 
         elif source.is_dir():
             files = source.glob("*.jpg")
-            for file in files:
-                image = cv2.imread(str(file), cv2.IMREAD_COLOR |
-                                   cv2.IMREAD_IGNORE_ORIENTATION)
-                # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                boxes = det_engine.infer(image)
-                if boxes is not None:
-                    keypoints = pose_engine.infer_pose(image, boxes)
-                    output = pose_engine.draw_keypoints(
-                        image, keypoints, radius=1)
-                cv2.imwrite(f"{str(file).rsplit('.', maxsplit=1)[0]}_out.jpg", cv2.cvtColor(
-                    output, cv2.COLOR_RGB2BGR))
+            # print(list(files))
+            many_dirs = False
+            if not list(files):
+                many_dirs = True
+                sources = []
+                dirs = source.glob("*")
+                for d in dirs:
+                    sources.append(Path(d))
+            else:
+                sources = [source]
+            for source in sources:
+                files = source.glob("*.jpg")
+                for file in tqdm(files):
+                    image = cv2.imread(str(file), cv2.IMREAD_COLOR |
+                                    cv2.IMREAD_IGNORE_ORIENTATION)
+                    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    if opt.bbox_dir:
+                        dir_path, fn = os.path.split(file)
+                        if many_dirs:
+                            bbox_dir = os.path.join(opt.bbox_dir, os.path.split(dir_path)[1])
+                        else:
+                            bbox_dir = opt.bbox_dir
+                        output_path = os.path.join(opt.save_dir, os.path.split(dir_path)[1])
+                        if not os.path.exists(output_path):
+                            os.makedirs(output_path)
+                        lbl_path = os.path.join(bbox_dir, fn.replace(".jpg", ".txt"))
+                        lbl_file = open(lbl_path, "r")
+                        lbl = lbl_file.read().splitlines()[0]
+                        yolo_bbox = list(map(float, lbl.strip().split()[1:]))
+                        bbox = yolo2xyxy(image.shape[:2], yolo_bbox)
+                        image = cv2.rectangle(image, (bbox[0], bbox[1]), 
+                                            (bbox[2], bbox[3]), (0, 0, 0))
+                        keypoints, maxvals = pose_engine.infer_pose(image, torch.Tensor(np.array(bbox)[None]))
+                        output = pose_engine.draw_keypoints(
+                            image, keypoints, radius=1)
+                        keypoint = keypoints[0][:13]
+                        maxvals = maxvals[0][:13]
+                        # print(keypoint);print(maxvals);quit()
+                        with open(os.path.join(output_path, fn.replace(".jpg", ".txt")), "w") as pose_file:
+                            for i, k in enumerate(keypoint):
+                                pose_file.write("%f %f %f\n" % (k[0], k[1], maxvals[i][0]))
+                        # cv2.imshow("Result", output) 
+                        # cv2.waitKey()
+                        # quit()
+                    else:
+                        boxes = det_engine.infer(image)
+                        if boxes is not None:
+                            keypoints, _ = pose_engine.infer_pose(image, boxes)
+                            output = pose_engine.draw_keypoints(
+                                image, keypoints, radius=1)
+                        # cv2.imshow("Result", cv2.cvtColor(
+                        #     output, cv2.COLOR_RGB2BGR)) 
+                        # cv2.waitKey()
+                        cv2.imwrite(f"{str(file).rsplit('.', maxsplit=1)[0]}_out.jpg", cv2.cvtColor(
+                            output, cv2.COLOR_RGB2BGR))
+                    # break
 
         elif source.is_file() and source.suffix in ['.mp4', '.avi', '.mkv']:
             video_out = f"{s.rsplit('.', maxsplit=1)[0]}_out.mp4"
@@ -298,7 +352,7 @@ def main(opt):
                 boxes = det_engine.infer(frame)
                 if boxes is not None:
                     begin_pose_fps = time()
-                    keypoints = pose_engine.infer_pose(frame, boxes)
+                    keypoints, _ = pose_engine.infer_pose(frame, boxes)
                     pose_fps.append((time()-begin_pose_fps)/keypoints.shape[0])
                     output = pose_engine.draw_keypoints(
                         frame, keypoints, radius=1)
@@ -326,7 +380,7 @@ def main(opt):
                 boxes = det_engine.infer(frame)
                 if boxes is not None:
                     begin_pose_fps = time()
-                    keypoints = pose_engine.infer_pose(frame, boxes)
+                    keypoints, _ = pose_engine.infer_pose(frame, boxes)
                     pose_fps.append(time()-begin_pose_fps)
                     frame = pose_engine.draw_keypoints(
                         frame, keypoints, radius=1)

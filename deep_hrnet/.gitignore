@@ -89,6 +89,7 @@ models/*
 log/*
 data/*
 external/
+weights/*
 
 draws/
 plot/

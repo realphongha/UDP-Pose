@@ -36,7 +36,10 @@ def draw_keypoints(img, keypoints, skeletons=False, r=1):
         if skeletons:
             for kid1, kid2 in skeletons:
                 cv2.line(img, tuple(kpts[kid1-1]), tuple(kpts[kid2-1]), (0, 255, 0), 2, cv2.LINE_AA)
+        # i = 0
         for x, y in kpts:
+            # if i >= 13: continue
+            # i += 1
             cv2.circle(img, (x, y), r, (255, 0, 0), 2, cv2.LINE_AA)
 
 

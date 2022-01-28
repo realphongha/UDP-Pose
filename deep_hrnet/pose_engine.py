@@ -88,7 +88,7 @@ class UdpPsaPoseAbs(metaclass=ABCMeta):
                         get_final_preds(self.config, outputs, 
                                         boxes[:, :2].numpy(), 
                                         boxes[:, 2:].numpy())
-        return preds
+        return preds, maxvals
     
     @abstractmethod
     def infer_pose(self, person_crop_image):
@@ -122,8 +122,8 @@ class UdpPsaPoseTorch(UdpPsaPoseAbs):
         pose_input, boxes =  self._preprocess(img, boxes)
         pose_input = pose_input.to(self._device)
         outputs = self.model(pose_input).clone().cpu().numpy()
-        keypoints = self._postprocess(outputs, boxes)
-        return keypoints
+        keypoints, maxvals = self._postprocess(outputs, boxes)
+        return keypoints, maxvals
     
     
 class UdpPsaPoseOnnx(UdpPsaPoseAbs):
@@ -146,8 +146,8 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
         for i in range(pose_input.shape[0]):
             output = self.ort_session.run(None, {self.input_name: pose_input[i][None]})[0]
             outputs = output if outputs is None else np.concatenate((outputs, output), axis=0)
-        keypoints = self._postprocess(outputs, boxes)
-        return keypoints    
+        keypoints, maxvals = self._postprocess(outputs, boxes)
+        return keypoints, maxvals    
 
 
 class UdpPsaPoseOpenVino(UdpPsaPoseAbs):
@@ -177,8 +177,8 @@ class UdpPsaPoseOpenVino(UdpPsaPoseAbs):
                 outputs = output
             else:
                 outputs = np.concatenate((outputs, output))
-        keypoints = self._postprocess(outputs, boxes)
-        return keypoints    
+        keypoints, maxvals = self._postprocess(outputs, boxes)
+        return keypoints, maxvals    
     
     
 class UdpPsaPoseMNN(UdpPsaPoseAbs):
@@ -223,5 +223,5 @@ class UdpPsaPoseMNN(UdpPsaPoseAbs):
         # raw_outputs.copyToHostTensor(tmp_output)
 
         outputs = raw_outputs.getNumpyData()
-        keypoints = self._postprocess(outputs, boxes)
-        return keypoints    
+        keypoints, maxvals = self._postprocess(outputs, boxes)
+        return keypoints, maxvals    

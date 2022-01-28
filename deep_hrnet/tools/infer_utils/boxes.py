@@ -214,3 +214,18 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 #         output[xi] = x[keep]
 
 #     return output
+
+
+def yolo2xyxy(size, box):
+    image_width, image_height = size[1], size[0]
+    center_X, center_y, width, height = box
+    x1 = (center_X-width/2)*image_width
+    x2 = (center_X+width/2)*image_width
+    y1 = (center_y-height/2)*image_height
+    y2 = (center_y+height/2)*image_height
+    x1, y1, x2, y2 = round(x1-1), round(y1-1), round(x2-1), round(y2-1)
+    if x1 < 0: x1 = 0
+    if y1 < 0: y1 = 0
+    if x2 >= image_width: x2 = image_width-1
+    if y2 >= image_height: y2 = image_height-1
+    return x1, y1, x2, y2
