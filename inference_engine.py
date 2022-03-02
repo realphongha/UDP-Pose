@@ -282,6 +282,7 @@ def main(opt):
                 for file in tqdm(files):
                     image = cv2.imread(str(file), cv2.IMREAD_COLOR |
                                     cv2.IMREAD_IGNORE_ORIENTATION)
+                    img_h, img_w = image.shape[:2]
                     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     if opt.bbox_dir:
                         dir_path, fn = os.path.split(file)
@@ -307,7 +308,7 @@ def main(opt):
                         # print(keypoint);print(maxvals);quit()
                         with open(os.path.join(output_path, fn.replace(".jpg", ".txt")), "w") as pose_file:
                             for i, k in enumerate(keypoint):
-                                pose_file.write("%f %f %f\n" % (k[0], k[1], maxvals[i][0]))
+                                pose_file.write("%f %f %f\n" % (k[0]/img_w, k[1]/img_h, maxvals[i][0]))
                         # cv2.imshow("Result", output) 
                         # cv2.waitKey()
                         # quit()
