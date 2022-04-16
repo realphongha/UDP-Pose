@@ -107,7 +107,6 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
         self.ort_session = onnxruntime.InferenceSession(model_path)
         self.input_name = self.ort_session.get_inputs()[0].name
     
-    @torch.no_grad()
     def infer_pose(self, img):
         pose_input = self._preprocess(img)
         pose_input = np.array(pose_input)[None]
@@ -117,7 +116,7 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
 
 
 if __name__ == "__main__":
-    file = "standalone_pose.jpg"
+    file = "img.jpg"
     input_shape = (192, 256)
     engine = UdpPsaPoseOnnx("weights/shufflenetv2plus_pixel_shuffle_256x192_small.onnx",
                             input_shape, "coco")
