@@ -184,8 +184,6 @@ def main():
     )
 
     for epoch in range(begin_epoch, cfg.TRAIN.END_EPOCH):
-        lr_scheduler.step()
-
         # train for one epoch
         train(cfg, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)
@@ -212,6 +210,8 @@ def main():
             'perf': perf_indicator,
             'optimizer': optimizer.state_dict(),
         }, best_model, final_output_dir)
+
+        lr_scheduler.step()
 
     final_model_state_file = os.path.join(
         final_output_dir, 'final_state.pth'
