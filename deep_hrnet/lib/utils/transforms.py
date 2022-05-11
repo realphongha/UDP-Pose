@@ -139,3 +139,86 @@ def crop(img, center, scale, output_size, rot=0):
     )
 
     return dst_img
+
+
+class HideAndSeek:
+    """Augmentation by informantion dropping in Hide-and-Seek paradigm. Paper
+    ref: Huang et al. AID: Pushing the Performance Boundary of Human Pose
+    Estimation with Information Dropping Augmentation (arXiv:2008.07139 2020).
+    Args:
+        prob (float): Probability of performing hide-and-seek.
+        prob_hiding_patches (float): Probability of hiding patches.
+        grid_sizes (list): List of optional grid sizes.
+    """
+
+    def __init__(self,
+                 prob=1.0,
+                 prob_hiding_patches=0.5,
+                 grid_sizes=(0, 16, 32, 44, 56)):
+        self.prob = prob
+        self.prob_hiding_patches = prob_hiding_patches
+        self.grid_sizes = grid_sizes
+
+    def _hide_and_seek(self, img):
+        # get width and height of the image
+        height, width, _ = img.shape
+
+        # randomly choose one grid size
+        index = np.random.randint(0, len(self.grid_sizes) - 1)
+        grid_size = self.grid_sizes[index]
+
+        # hide the patches
+        if grid_size != 0:
+            for x in range(0, width, grid_size):
+                for y in range(0, height, grid_size):
+                    x_end = min(width, x + grid_size)
+                    y_end = min(height, y + grid_size)
+                    if np.random.rand() <= self.prob_hiding_patches:
+                        img[x:x_end, y:y_end, :] = 0
+        return img
+
+    def __call__(self, img):
+        if np.random.rand() < self.prob:
+            img = self._hide_and_seek(img)
+        return img
+
+
+class Cutout:
+    """Augmentation by informantion dropping in Cutout paradigm. Paper ref:
+    Huang et al. AID: Pushing the Performance Boundary of Human Pose Estimation
+    with Information Dropping Augmentation (arXiv:2008.07139 2020).
+    Args:
+        prob (float): Probability of performing cutout.
+        radius_factor (float): Size factor of cutout area.
+        num_patch (float): Number of patches to be cutout.
+    """
+
+    def __init__(self, prob=1.0, radius_factor=0.2, num_patch=1):
+
+        self.prob = prob
+        self.radius_factor = radius_factor
+        self.num_patch = num_patch
+
+    def _cutout(self, img):
+        height, width, _ = img.shape
+        img = img.reshape(height * width, -1)
+        feat_x_int = np.arange(0, width)
+        feat_y_int = np.arange(0, height)
+        feat_x_int, feat_y_int = np.meshgrid(feat_x_int, feat_y_int)
+        feat_x_int = feat_x_int.flatten()
+        feat_y_int = feat_y_int.flatten()
+        for _ in range(self.num_patch):
+            center = [np.random.rand() * width, np.random.rand() * height]
+            radius = self.radius_factor * (1 + np.random.rand(2)) * width
+            x_offset = (center[0] - feat_x_int) / radius[0]
+            y_offset = (center[1] - feat_y_int) / radius[1]
+            dis = x_offset**2 + y_offset**2
+            indexes = np.where(dis <= 1)[0]
+            img[indexes, :] = 0
+        img = img.reshape(height, width, -1)
+        return img
+
+    def __call__(self, img):
+        if np.random.rand() < self.prob:
+            img = self._cutout(img)
+        return img

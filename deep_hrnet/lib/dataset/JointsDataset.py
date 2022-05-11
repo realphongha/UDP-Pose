@@ -20,6 +20,7 @@ from torch.utils.data import Dataset
 from utils.transforms import get_affine_transform
 from utils.transforms import affine_transform
 from utils.transforms import fliplr_joints
+from utils.transforms import Cutout, HideAndSeek
 
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,18 @@ class JointsDataset(Dataset):
         self.num_joints_half_body = cfg.DATASET.NUM_JOINTS_HALF_BODY
         self.prob_half_body = cfg.DATASET.PROB_HALF_BODY
         self.color_rgb = cfg.DATASET.COLOR_RGB
+        
+        # AID:
+        self.cutout = None
+        cfg_cutout = cfg.DATASET.CUTOUT
+        if cfg_cutout:
+            self.cutout = Cutout(*cfg_cutout) \
+                if len(cfg_cutout) == 3 else Cutout()
+        self.hide_and_seek = None
+        cfg_hide_and_seek = cfg.DATASET.HIDE_AND_SEEK
+        if cfg_hide_and_seek:
+            self.hide_and_seek = HideAndSeek(*cfg_hide_and_seek) \
+                if len(cfg_hide_and_seek) == 3 else HideAndSeek()
 
         self.target_type = cfg.MODEL.TARGET_TYPE
         self.image_size = np.array(cfg.MODEL.IMAGE_SIZE)
@@ -213,6 +226,13 @@ class JointsDataset(Dataset):
         trans = get_warpmatrix(r,c*2.0,self.image_size-1.0,s)
         input = cv2.warpAffine(data_numpy, trans, (int(self.image_size[0]), int(self.image_size[1])), flags=cv2.WARP_INVERSE_MAP|cv2.INTER_LINEAR)
         joints[:, 0:2] = rotate_points(joints[:, 0:2], r, c, self.image_size, s, False)
+        
+        # AID
+        if self.is_train:
+            if self.cutout:
+                input = self.cutout(input)
+            if self.hide_and_seek:
+                input = self.hide_and_seek(input)
 
         if self.transform:
             input = self.transform(input)
