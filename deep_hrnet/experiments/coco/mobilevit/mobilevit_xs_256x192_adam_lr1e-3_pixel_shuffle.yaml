@@ -39,7 +39,7 @@ MODEL:
   EXTRA:
     START_CHANNELS: 256
     ARCHITECTURE: (512, 256, 128)
-    MODEL_SIZE: 's' # 'xs', 'xxs'
+    MODEL_SIZE: 'xs' # 'xs', 'xxs'
     PRETRAINED_LAYERS:
     - 'backbone'
     FINAL_CONV_KERNEL: 1

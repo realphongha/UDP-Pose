@@ -5,6 +5,7 @@
 
 import math
 import os
+import torch
 from torch import nn, Tensor
 from torch.nn import (
     BatchNorm1d, BatchNorm2d, SyncBatchNorm, LayerNorm, InstanceNorm1d, InstanceNorm2d, GroupNorm,
@@ -17,12 +18,12 @@ from typing import Dict, Tuple, Optional, Union
 
 import logging
 
-from torchaudio import list_audio_backends
-
 from .configs.mobilevit import get_configuration
 from .utils.init_utils import initialize_weights, norm_layers_tuple
+from collections.abc import MutableMapping
 import argparse
-    
+import yaml
+
 
 def load_cfg(config_path):
     def flatten_yaml_as_dict(d, parent_key='', sep='.'):
@@ -35,7 +36,7 @@ def load_cfg(config_path):
                 items.append((new_key, v))
         return dict(items)
 
-    opts = argparse.ArgumentParser().parse_args()
+    opts = argparse.Namespace()
     with open(config_path, 'r') as yaml_file:
         try:
             cfg = yaml.load(yaml_file, Loader=yaml.FullLoader)
@@ -149,8 +150,8 @@ class Identity(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x
-    
-    
+
+
 class InvertedResidual(nn.Module):
     """
     Inverted residual block (MobileNetv2): https://arxiv.org/abs/1801.04381
@@ -197,8 +198,8 @@ class InvertedResidual(nn.Module):
             return x + self.block(x)
         else:
             return self.block(x)
-    
-    
+
+
 class LinearLayer(nn.Module):
     def __init__(self,
                  in_features: int,
@@ -363,14 +364,14 @@ class GlobalPool(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return self._global_pool(x)
-    
-    
+
+
 class MultiHeadAttention(nn.Module):
     '''
             This layer applies a multi-head attention as described in "Attention is all you need" paper
             https://arxiv.org/abs/1706.03762
     '''
-    def __init__(self, embed_dim: int, num_heads: int, attn_dropout: Optional[float] =0.0, 
+    def __init__(self, embed_dim: int, num_heads: int, attn_dropout: Optional[float] =0.0,
                  bias: Optional[bool] = True,
                  *args, **kwargs):
         """
@@ -463,8 +464,8 @@ class MultiHeadAttention(nn.Module):
             return self.forward_mac_device(x)
         else:
             return self.forward_other(x)
-    
-    
+
+
 class TransformerEncoder(nn.Module):
     """
         This class defines the Transformer encoder (pre-norm) as described in "Attention is all you need" paper
@@ -511,8 +512,8 @@ class TransformerEncoder(nn.Module):
         # Feed forward network
         x = x + self.pre_norm_ffn(x)
         return x
-    
-    
+
+
 class MobileViTBlock(nn.Module):
     """
         MobileViT block: https://arxiv.org/abs/2110.02178?context=cs.LG
@@ -701,7 +702,7 @@ class MobileViT(nn.Module):
             dilate_l5 = True
         elif output_stride == 16:
             dilate_l5 = True
-            
+
         self.dilation = 1
         self.round_nearest = 8
 
@@ -767,7 +768,7 @@ class MobileViT(nn.Module):
 
         # weight initialization
         self.reset_parameters(opts=opts)
-        
+
     def check_model(self):
         assert self.model_conf_dict, "Model configuration dictionary should not be empty"
         assert self.conv_1 is not None, 'Please implement self.conv_1'
@@ -778,7 +779,7 @@ class MobileViT(nn.Module):
         assert self.layer_5 is not None, 'Please implement self.layer_5'
         assert self.conv_1x1_exp is not None, 'Please implement self.conv_1x1_exp'
         assert self.classifier is not None, 'Please implement self.classifier'
-        
+
     def reset_parameters(self, opts):
         initialize_weights(opts=opts, modules=self.modules())
 
@@ -925,7 +926,7 @@ class MobileViT(nn.Module):
         )
 
         return nn.Sequential(*block), input_channel
-    
+
 
 def get_mobilevit(cfg_file, pretrained=None):
     opts = load_cfg(cfg_file)
@@ -936,17 +937,13 @@ def get_mobilevit(cfg_file, pretrained=None):
 
 
 if __name__ == "__main__":
-    import torch
-    import yaml
-    from collections.abc import MutableMapping
-    
     config_path = "models/backbones/configs/mobilevit_xxs.yaml"
     opts = load_cfg(config_path)
 
     model = MobileViT(opts)
     # print(model)
     print("Params:", sum(p.numel() for p in model.parameters()))
-    
+
     print("Loading pretrained...")
     model = load_pretrained_model(model, r"E:\Learning\internship\deep learning\attention\weights\mobilevit_xxs.pt")
 

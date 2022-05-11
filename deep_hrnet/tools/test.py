@@ -82,9 +82,9 @@ def main():
     torch.backends.cudnn.enabled = cfg.CUDNN.ENABLED
 
     model = models.MODELS[cfg.MODEL.NAME](cfg, is_train=False)
-    from thop import profile
-    m, p = profile(model, inputs=(torch.empty(16, 3, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1]),))
-    print("Params:", p)
+    # from thop import profile
+    # m, p = profile(model, inputs=(torch.empty(16, 3, cfg.MODEL.IMAGE_SIZE[0], cfg.MODEL.IMAGE_SIZE[1]),))
+    # print("Params:", p)
 
     if cfg.TEST.MODEL_FILE:
         logger.info('=> loading model from {}'.format(cfg.TEST.MODEL_FILE))
