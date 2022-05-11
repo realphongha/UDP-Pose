@@ -369,6 +369,7 @@ if __name__ == "__main__":
     architecture = [0, 0, 3, 1, 1, 1, 0, 0, 2, 0, 2, 1, 1, 0, 2, 0, 2, 1, 3, 2]
     model = ShuffleNetV2_Plus(architecture=architecture)
     # print(model)
+    print("Params:", sum(p.numel() for p in model.parameters()))
 
     test_data = torch.rand(5, 3, 224, 224)
     test_outputs = model(test_data)
