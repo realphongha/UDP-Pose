@@ -28,6 +28,7 @@ class UdpPsaPoseAbs(metaclass=ABCMeta):
             self.skeleton = UdpPsaPoseAbs.SKELETONS[data_type]
         except KeyError:
             self.skeleton = None
+        self.data_type = "coco"
         self.mean = (0.485, 0.456, 0.406)
         self.std = (0.229, 0.224, 0.225)
         
@@ -62,19 +63,28 @@ class UdpPsaPoseAbs(metaclass=ABCMeta):
         preds *= pred_mask
         return preds, maxvals
     
-    def draw_keypoints(self, image, keypoints, radius=1):
+    def draw_keypoints(self, image, keypoints, hands=False, radius=1):
         if len(keypoints) == 0:
             return image
         for kpts in keypoints:
+            np_kpts = kpts.copy()
             kpts = [list(map(int, x)) for x in kpts]
             if self.skeleton:
                 for kid1, kid2 in self.skeleton:
                     cv2.line(image, tuple(kpts[kid1-1]), tuple(kpts[kid2-1]), (0, 255, 0), 2, cv2.LINE_AA)
-            # i = 0
+            i = 0
             for x, y in kpts:
                 # if i >= 13: continue
-                # i += 1
-                cv2.circle(image, (x, y), radius, (255, 0, 0), 2, cv2.LINE_AA)
+                cv2.circle(image, (x, y), radius, (255, 0, 0), 5, cv2.LINE_AA)
+                # cv2.putText(image, str(i), (x, y), cv2.FONT_HERSHEY_SIMPLEX,
+                #     1, (0, 0, 0))
+                i += 1
+            if hands and self.data_type == "coco":
+                lhand = np_kpts[9] + (np_kpts[9]-np_kpts[7])/3
+                rhand = np_kpts[10] + (np_kpts[10]-np_kpts[8])/3
+                for point in (lhand, rhand):
+                    cv2.circle(image, (int(point[0]), int(point[1])), 
+                        radius, (0, 0, 255), 2, cv2.LINE_AA)
         return image
         
     def _preprocess(self, img):
@@ -115,8 +125,40 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
         return keypoints, maxvals, output.shape
 
 
+class UdpPsaPoseMnn(UdpPsaPoseAbs):
+    
+    def __init__(self, model_path, input_shape, data_type="coco"):
+        super(UdpPsaPoseMnn, self).__init__(input_shape, data_type)
+        
+        import MNN
+        self.MNNlib = MNN
+
+        self.interpreter = self.MNNlib.Interpreter(model_path)
+        # self.interpreter.setCacheFile('.tempcache')
+        config = {}
+        # config['precision'] = 'low'
+        runtimeinfo, exists = self.MNNlib.Interpreter.createRuntime((config,))
+        # print(runtimeinfo, exists)
+        self.session = self.interpreter.createSession(config, runtimeinfo)
+        self.input_tensor = self.interpreter.getSessionInput(self.session, "images") 
+    
+    def infer_pose(self, img):
+        pose_input = self._preprocess(img)
+        pose_input = np.array(pose_input)[None]
+        tmp_input = self.MNNlib.Tensor(pose_input.shape, 
+            self.MNNlib.Halide_Type_Float, 
+            pose_input, 
+            self.MNNlib.Tensor_DimensionType_Caffe)
+        self.input_tensor.copyFrom(tmp_input)
+        self.interpreter.runSession(self.session)
+        output = self.interpreter.getSessionOutput(self.session).getNumpyData()
+        keypoints, maxvals = self._postprocess(output)
+        return keypoints, maxvals, output.shape
+
+
 if __name__ == "__main__":
-    file = "img.jpg"
+    # file = "img.jpg"
+    file = r"C:\Users\Dell\Desktop\shelf2.jpg"
     input_shape = (192, 256)
     engine = UdpPsaPoseOnnx("weights/shufflenetv2plus_pixel_shuffle_256x192_small.onnx",
                             input_shape, "coco")
@@ -127,7 +169,7 @@ if __name__ == "__main__":
     print(output_shape)
     keypoints[:, :, 0] *= (img.shape[1]/output_shape[3])
     keypoints[:, :, 1] *= (img.shape[0]/output_shape[2])
-    img = engine.draw_keypoints(img, keypoints)
+    img = engine.draw_keypoints(img, keypoints, hands=True)
     cv2.imshow("Test", img)
     cv2.waitKey()
     

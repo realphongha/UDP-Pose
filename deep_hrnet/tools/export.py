@@ -21,14 +21,20 @@ from lib.models import MODELS
 def export_onnx(model, img, opt):
     import onnx
 
+    # torch.onnx.export(model, img, opt.file, 
+    #                   verbose=False, 
+    #                   opset_version=opt.opset,
+    #                   do_constant_folding=True,
+    #                   input_names=['images'],
+    #                   output_names=['output'],
+    #                   dynamic_axes={'images': {0: 'batch_size'},
+    #                                 'output': {0: 'batch_size'}})
     torch.onnx.export(model, img, opt.file, 
                       verbose=False, 
                       opset_version=opt.opset,
                       do_constant_folding=True,
                       input_names=['images'],
-                      output_names=['output'],
-                      dynamic_axes={'images': {0: 'batch_size'},
-                                    'output': {0: 'batch_size'}})
+                      output_names=['output'])
 
     # Checks
     model_onnx = onnx.load(opt.file)  # load onnx model
