@@ -127,20 +127,18 @@ class UdpPsaPoseOnnx(UdpPsaPoseAbs):
 
 class UdpPsaPoseMnn(UdpPsaPoseAbs):
     
-    def __init__(self, model_path, input_shape, data_type="coco"):
+    def __init__(self, model_path, input_shape, data_type="coco", 
+        heatmap_shape=(1, 17, 64, 48)):
         super(UdpPsaPoseMnn, self).__init__(input_shape, data_type)
         
         import MNN
         self.MNNlib = MNN
 
         self.interpreter = self.MNNlib.Interpreter(model_path)
-        # self.interpreter.setCacheFile('.tempcache')
-        config = {}
-        # config['precision'] = 'low'
-        runtimeinfo, exists = self.MNNlib.Interpreter.createRuntime((config,))
-        # print(runtimeinfo, exists)
-        self.session = self.interpreter.createSession(config, runtimeinfo)
+        self.interpreter.setCacheFile('.tempcache')
+        self.session = self.interpreter.createSession()
         self.input_tensor = self.interpreter.getSessionInput(self.session, "images") 
+        self.heatmap_shape = heatmap_shape
     
     def infer_pose(self, img):
         pose_input = self._preprocess(img)
@@ -151,17 +149,24 @@ class UdpPsaPoseMnn(UdpPsaPoseAbs):
             self.MNNlib.Tensor_DimensionType_Caffe)
         self.input_tensor.copyFrom(tmp_input)
         self.interpreter.runSession(self.session)
-        output = self.interpreter.getSessionOutput(self.session).getNumpyData()
+        output_tensor = self.interpreter.getSessionOutput(self.session, "output")
+        tmp_output = self.MNNlib.Tensor(self.heatmap_shape, 
+            self.MNNlib.Halide_Type_Float, 
+            np.ones(self.heatmap_shape).astype(np.float32), 
+            self.MNNlib.Tensor_DimensionType_Caffe)
+        output_tensor.copyToHostTensor(tmp_output)
+        output = tmp_output.getNumpyData()
         keypoints, maxvals = self._postprocess(output)
         return keypoints, maxvals, output.shape
 
 
 if __name__ == "__main__":
-    # file = "img.jpg"
-    file = r"C:\Users\Dell\Desktop\shelf2.jpg"
+    file = "img.jpg"
     input_shape = (192, 256)
-    engine = UdpPsaPoseOnnx("weights/shufflenetv2plus_pixel_shuffle_256x192_small.onnx",
-                            input_shape, "coco")
+    # engine = UdpPsaPoseOnnx("weights/shufflenetv2plus_pixel_shuffle_256x192_small.onnx",
+    #                         input_shape, "coco")
+    engine = UdpPsaPoseMnn("weights/shufflenetv2plus_pixel_shuffle_256x192_small.mnn",
+                            input_shape, "coco", (1, 17, 64, 48))
     img = cv2.imread(file)
     keypoints, maxvals, output_shape = engine.infer_pose(img.copy())
     print(keypoints)

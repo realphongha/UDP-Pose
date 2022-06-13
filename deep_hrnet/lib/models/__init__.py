@@ -22,7 +22,8 @@ from .pose_mobilenetv3_small import get_pose_net as pm3_s
 from .pose_shufflenetv2_plus_pixel_shuffle import get_pose_net as ps2p_ps
 from .pose_shufflenetv2_10x_pixel_shuffle import get_pose_net as ps2_10_ps
 from .pose_mobilenetv3_small_pixel_shuffle import get_pose_net as pm3_s_ps
-from .pose_mobilevit_pixel_shuffle import  get_pose_net as pmv_ps
+from .pose_mobilevit_pixel_shuffle import get_pose_net as pmv_ps
+from .pose_mobilevitv2_pixel_shuffle import get_pose_net as pmvv2_ps
 
 MODELS = {
     "pose_resnet": pr,
@@ -36,4 +37,5 @@ MODELS = {
     "pose_shufflenetv2_10x_pixel_shuffle": ps2_10_ps,
     "pose_mobilenetv3_small_pixel_shuffle": pm3_s_ps,
     "pose_mobilevit_pixel_shuffle": pmv_ps,
+    "pose_mobilevitv2_pixel_shuffle": pmvv2_ps
 }
