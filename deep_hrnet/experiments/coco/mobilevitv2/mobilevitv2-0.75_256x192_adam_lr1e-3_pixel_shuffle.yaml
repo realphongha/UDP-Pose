@@ -43,7 +43,7 @@ MODEL:
   EXTRA:
     START_CHANNELS: 256
     ARCHITECTURE: (512, 256, 128)
-    MODEL_SIZE: '0.75'
+    MODEL_SIZE: 0.75
     PRETRAINED_LAYERS:
     - 'backbone'
     FINAL_CONV_KERNEL: 1
@@ -58,8 +58,8 @@ TRAIN:
   LR: 0.001
   LR_FACTOR: 0.1
   LR_STEP:
-  - 170
-  - 200
+  - 300
+  - 380
   WD: 0.0001
   GAMMA1: 0.99
   GAMMA2: 0.0

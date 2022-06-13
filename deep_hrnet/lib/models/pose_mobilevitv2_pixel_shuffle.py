@@ -24,11 +24,11 @@ class PoseMobileVitV2PixelShuffle(nn.Module):
 
     def __init__(self, cfg, pretrained, **kwargs):
         extra = cfg.MODEL.EXTRA
-        if extra.MODEL_SIZE == "1.0":
+        if extra.MODEL_SIZE == 1.0:
             self.inplanes = 512
-        elif extra.MODEL_SIZE == "0.75":
+        elif extra.MODEL_SIZE == 0.75:
             self.inplanes = 384
-        elif extra.MODEL_SIZE == "0.5":
+        elif extra.MODEL_SIZE == 0.5:
             self.inplanes = 320
         else:
             raise NotImplementedError("Wrong model size:", extra.MODEL_SIZE)
