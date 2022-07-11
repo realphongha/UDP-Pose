@@ -44,6 +44,7 @@ class UdpPsaPoseAbs(metaclass=ABCMeta):
         
     @staticmethod    
     def xyxy2xywh(x):
+        x = torch.tensor(x).float()
         y = x.clone()
         y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
         y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center

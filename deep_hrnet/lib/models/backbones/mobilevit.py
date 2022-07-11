@@ -932,7 +932,7 @@ def get_mobilevit(cfg_file, pretrained=None):
     opts = load_cfg(cfg_file)
     model = MobileViT(opts)
     if pretrained:
-        model = model = load_pretrained_model(model, pretrained)
+        model = load_pretrained_model(model, pretrained)
     return model
 
 

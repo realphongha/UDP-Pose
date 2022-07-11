@@ -54,7 +54,7 @@ def parse_opt():
     parser.add_argument('--cfg', type=str, required=True,
                         help='path to pose model configuration file')
     parser.add_argument('--det_model', nargs='+', type=str,
-                        default=ROOT / 'yolov5s.pt', help='model path(s)')
+                        default=None, help='model path(s)')
     parser.add_argument('--weights', type=str, default=None,
                         help='.pth weights for det_model')
     parser.add_argument('--source', nargs='+', type=str, default=ROOT /
@@ -229,7 +229,9 @@ class YoloDetectionTorch(YoloDetectionAbs):
 def main(opt):
     device = torch.device(opt.device)
 
-    det_engine = YoloDetectionTorch(opt, device)
+    det_engine = None
+    if opt.det_model:
+        det_engine = YoloDetectionTorch(opt, device) 
     if opt.pose_format == 'torch':
         pose_engine = UdpPsaPoseTorch(opt.pose_model,
                                       opt.cfg,
@@ -256,7 +258,10 @@ def main(opt):
             image = cv2.imread(str(source), cv2.IMREAD_COLOR |
                                cv2.IMREAD_IGNORE_ORIENTATION)
             # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            boxes = det_engine.infer(image)
+            if det_engine:
+                boxes = det_engine.infer(image)
+            else:
+                boxes = np.array([[0, 0, image.shape[1]-1, image.shape[0]-1]])
             if boxes is not None:
                 keypoints, _ = pose_engine.infer_pose(image, boxes)
                 output = pose_engine.draw_keypoints(image, keypoints, radius=1)
@@ -282,15 +287,16 @@ def main(opt):
                                     cv2.IMREAD_IGNORE_ORIENTATION)
                     img_h, img_w = image.shape[:2]
                     # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    dir_path, fn = os.path.split(file)
+                    if opt.save_dir:
+                        output_path = os.path.join(opt.save_dir, os.path.split(dir_path)[1])
+                        if not os.path.exists(output_path):
+                            os.makedirs(output_path)
                     if opt.bbox_dir:
-                        dir_path, fn = os.path.split(file)
                         if many_dirs:
                             bbox_dir = os.path.join(opt.bbox_dir, os.path.split(dir_path)[1])
                         else:
                             bbox_dir = opt.bbox_dir
-                        output_path = os.path.join(opt.save_dir, os.path.split(dir_path)[1])
-                        if not os.path.exists(output_path):
-                            os.makedirs(output_path)
                         lbl_path = os.path.join(bbox_dir, fn.replace(".jpg", ".txt"))
                         lbl_file = open(lbl_path, "r")
                         lbl = lbl_file.read().splitlines()[0]
@@ -304,23 +310,33 @@ def main(opt):
                         keypoint = keypoints[0][:13]
                         maxvals = maxvals[0][:13]
                         # print(keypoint);print(maxvals);quit()
-                        with open(os.path.join(output_path, fn.replace(".jpg", ".txt")), "w") as pose_file:
-                            for i, k in enumerate(keypoint):
-                                pose_file.write("%f %f %f\n" % (k[0]/img_w, k[1]/img_h, maxvals[i][0]))
+                        if opt.save_dir:
+                            with open(os.path.join(output_path, fn.replace(".jpg", ".txt")), "w") as pose_file:
+                                for i, k in enumerate(keypoint):
+                                    pose_file.write("%f %f %f\n" % (k[0]/img_w, k[1]/img_h, maxvals[i][0]))
                         # cv2.imshow("Result", output) 
                         # cv2.waitKey()
                         # quit()
                     else:
-                        boxes = det_engine.infer(image)
+                        if det_engine:
+                            boxes = det_engine.infer(image)
+                        else:
+                            boxes = np.array([[0, 0, image.shape[1]-1, image.shape[0]-1]])
                         if boxes is not None:
-                            keypoints, _ = pose_engine.infer_pose(image, boxes)
-                            output = pose_engine.draw_keypoints(
-                                image, keypoints, radius=1)
-                        # cv2.imshow("Result", cv2.cvtColor(
-                        #     output, cv2.COLOR_RGB2BGR)) 
-                        # cv2.waitKey()
-                        cv2.imwrite(f"{str(file).rsplit('.', maxsplit=1)[0]}_out.jpg", cv2.cvtColor(
-                            output, cv2.COLOR_RGB2BGR))
+                            keypoints, maxvals = pose_engine.infer_pose(image, boxes)
+                            keypoint = keypoints[0][:13]
+                            maxvals = maxvals[0][:13]
+                            if opt.save_dir:
+                                with open(os.path.join(output_path, fn.replace(".jpg", ".txt")), "w") as pose_file:
+                                    for i, k in enumerate(keypoint):
+                                        pose_file.write("%f %f %f\n" % (k[0]/img_w, k[1]/img_h, maxvals[i][0]))
+                            # output = pose_engine.draw_keypoints(
+                            #     image, keypoints, radius=1)
+                            # cv2.imshow("Result", cv2.cvtColor(
+                            #     output, cv2.COLOR_RGB2BGR)) 
+                            # cv2.waitKey()
+                            # cv2.imwrite(f"{str(file).rsplit('.', maxsplit=1)[0]}_out.jpg", cv2.cvtColor(
+                            #     output, cv2.COLOR_RGB2BGR))
                     # break
 
         elif source.is_file() and source.suffix in ['.mp4', '.avi', '.mkv']:
@@ -348,7 +364,10 @@ def main(opt):
                     break
                 if frame is None:
                     continue
-                boxes = det_engine.infer(frame)
+                if det_engine:
+                    boxes = det_engine.infer(frame)
+                else:
+                    boxes = np.array([[0, 0, frame.shape[1]-1, frame.shape[0]-1]])
                 if boxes is not None:
                     begin_pose_fps = time()
                     keypoints, _ = pose_engine.infer_pose(frame, boxes)
@@ -376,7 +395,10 @@ def main(opt):
             for frame in webcam:
                 begin_fps = time()
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                boxes = det_engine.infer(frame)
+                if det_engine:
+                    boxes = det_engine.infer(frame)
+                else:
+                    boxes = np.array([[0, 0, frame.shape[1]-1, frame.shape[0]-1]])
                 if boxes is not None:
                     begin_pose_fps = time()
                     keypoints, _ = pose_engine.infer_pose(frame, boxes)

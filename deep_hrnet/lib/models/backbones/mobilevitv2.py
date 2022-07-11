@@ -1457,12 +1457,12 @@ def get_mobilevit_v2(cfg_file, pretrained=None):
     opts = load_cfg(cfg_file)
     model = MobileViTv2(opts)
     if pretrained:
-        model = model = load_pretrained_model(model, pretrained)
+        model = load_pretrained_model(model, pretrained)
     return model
 
 
 if __name__ == "__main__":
-    config_path = "models/backbones/configs/mobilevitv2-0.75.yaml"
+    config_path = "models/backbones/configs/mobilevitv2-0.5.yaml"
     opts = load_cfg(config_path)
 
     model = MobileViTv2(opts)
@@ -1470,8 +1470,8 @@ if __name__ == "__main__":
     print("Params:", sum(p.numel() for p in model.parameters()))
 
     print("Loading pretrained...")
-    model = load_pretrained_model(model, r"E:\Learning\internship\deep learning\attention\weights\mobilevitv2\mobilevitv2-0.75.pt")
+    model = load_pretrained_model(model, r"E:\Learning\internship\deep learning\attention\weights\mobilevitv2\mobilevitv2-0.5.pt")
 
-    test_data = torch.rand(5, 3, 224, 224)
+    test_data = torch.rand(5, 3, 256, 192)
     test_outputs = model(test_data)
     print(test_outputs.size())

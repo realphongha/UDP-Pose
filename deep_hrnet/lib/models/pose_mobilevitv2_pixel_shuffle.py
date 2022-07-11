@@ -29,7 +29,7 @@ class PoseMobileVitV2PixelShuffle(nn.Module):
         elif extra.MODEL_SIZE == 0.75:
             self.inplanes = 384
         elif extra.MODEL_SIZE == 0.5:
-            self.inplanes = 320
+            self.inplanes = 256
         else:
             raise NotImplementedError("Wrong model size:", extra.MODEL_SIZE)
         super(PoseMobileVitV2PixelShuffle, self).__init__()
